@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Resume Analyzer & Interview Coach</title>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --green: #16a34a;
+    --red: #dc2626;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    color: white;
+    padding: 32px 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 8px; font-size: 28px; }
+  header p { margin: 0; opacity: 0.9; }
+  .container {
+    max-width: 900px;
+    margin: -20px auto 40px;
+    padding: 0 20px;
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  label { font-weight: 600; display: block; margin-bottom: 6px; }
+  input[type="file"], textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  textarea { min-height: 140px; resize: vertical; margin-top: 4px; }
+  input[type="file"] { margin-top: 4px; }
+  .field { margin-bottom: 18px; }
+  button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:hover { background: var(--primary-dark); }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  .score-box {
+    text-align: center;
+    padding: 20px;
+    border-radius: 10px;
+    background: #f1f5f9;
+  }
+  .score-box .value { font-size: 32px; font-weight: 700; color: var(--primary); }
+  .score-box .label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .tag {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    margin: 3px;
+  }
+  .tag.matched { background: #dcfce7; color: var(--green); }
+  .tag.missing { background: #fee2e2; color: var(--red); }
+  h2 { font-size: 18px; margin-top: 0; }
+  .question-item, .roadmap-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .question-item:last-child, .roadmap-item:last-child { border-bottom: none; }
+  .question-item .skill-label, .roadmap-item .skill-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  #loading { display: none; text-align: center; padding: 20px; color: var(--muted); }
+  #error { display: none; background: #fee2e2; color: var(--red); padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+  #results { display: none; }
+  .spinner {
+    border: 3px solid #e2e8f0;
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 AI Resume Analyzer & Interview Coach</h1>
+  <p>Upload your resume, paste a job description, and get instant feedback</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <form id="analyzeForm">
+      <div class="field">
+        <label for="resumeFile">Upload Resume (PDF or DOCX)</label>
+        <input type="file" id="resumeFile" name="resume_file" accept=".pdf,.docx" required />
+      </div>
+      <div class="field">
+        <label for="jobDescription">Paste Job Description</label>
+        <textarea id="jobDescription" name="job_description" placeholder="Paste the job description here..." required></textarea>
+      </div>
+      <button type="submit" id="submitBtn">Analyze Resume</button>
+    </form>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    Analyzing your resume... this can take a few seconds the first time.
+  </div>
+
+  <div id="results">
+    <div class="card">
+      <h2>📊 Match Scores</h2>
+      <div class="score-grid">
+        <div class="score-box">
+          <div class="value" id="atsScore">-</div>
+          <div class="label">ATS Score</div>
+        </div>
+        <div class="score-box">
+          <div class="value" id="skillMatch">-</div>
+          <div class="label">Skill Match %</div>
+        </div>
+        <div class="score-box">
+          <div class="value" id="semanticScore">-</div>
+          <div class="label">Semantic Similarity</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✅ Matched Skills</h2>
+      <div id="matchedSkills"></div>
+    </div>
+
+    <div class="card">
+      <h2>⚠️ Missing Skills</h2>
+      <div id="missingSkills"></div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Suggested Interview Questions</h2>
+      <div id="interviewQuestions"></div>
+    </div>
+
+    <div class="card">
+      <h2>📚 Learning Roadmap</h2>
+      <div id="learningRoadmap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('analyzeForm');
+const loading = document.getElementById('loading');
+const results = document.getElementById('results');
+const errorBox = document.getElementById('error');
+const submitBtn = document.getElementById('submitBtn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorBox.style.display = 'none';
+  results.style.display = 'none';
+  loading.style.display = 'block';
+  submitBtn.disabled = true;
+
+  const formData = new FormData();
+  formData.append('resume_file', document.getElementById('resumeFile').files[0]);
+  formData.append('job_description', document.getElementById('jobDescription').value);
+
+  try {
+    const response = await fetch('/analyze', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.detail || 'Something went wrong.');
+    }
+
+    const data = await response.json();
+    renderResults(data);
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.style.display = 'block';
+  } finally {
+    loading.style.display = 'none';
+    submitBtn.disabled = false;
+  }
+});
+
+function renderResults(data) {
+  document.getElementById('atsScore').textContent = data.ats_score + '%';
+  document.getElementById('skillMatch').textContent = data.skill_match_percent + '%';
+  document.getElementById('semanticScore').textContent = data.semantic_similarity + '%';
+
+  const matchedDiv = document.getElementById('matchedSkills');
+  matchedDiv.innerHTML = data.matched_skills.length
+    ? data.matched_skills.map(s => `<span class="tag matched">${s}</span>`).join('')
+    : '<p style="color:#64748b;">No overlapping skills found.</p>';
+
+  const missingDiv = document.getElementById('missingSkills');
+  missingDiv.innerHTML = data.missing_skills.length
+    ? data.missing_skills.map(s => `<span class="tag missing">${s}</span>`).join('')
+    : '<p style="color:#64748b;">No missing skills — great match!</p>';
+
+  const questionsDiv = document.getElementById('interviewQuestions');
+  questionsDiv.innerHTML = data.interview_questions.length
+    ? data.interview_questions.map(q => `
+        <div class="question-item">
+          <div class="skill-label">${q.skill}</div>
+          <div>${q.question}</div>
+        </div>`).join('')
+    : '<p style="color:#64748b;">No skills detected to generate questions from.</p>';
+
+  const roadmapDiv = document.getElementById('learningRoadmap');
+  roadmapDiv.innerHTML = data.learning_roadmap.length
+    ? data.learning_roadmap.map(r => `
+        <div class="roadmap-item">
+          <div class="skill-label">${r.skill}</div>
+          <div>${r.resource}</div>
+        </div>`).join('')
+    : '<p style="color:#64748b;">No gaps to fill — you\'re fully prepared for this role!</p>';
+
+  results.style.display = 'block';
+  results.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+
+</body>
+</html>
